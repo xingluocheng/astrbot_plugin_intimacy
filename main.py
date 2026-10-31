@@ -17,6 +17,7 @@ PLUGIN_NAME = "astrbot_plugin_intimacy"
 DEFAULTS = {
     "enabled": True,
     "owner_ids": "",
+    "bot_ids": "",
     "familiar_days": 3,
     "close_days": 14,
     "scope": "private",
@@ -72,6 +73,20 @@ class IntimacyStar(Star):
             return False
 
     # ------------------------------------------------------------- 等级
+    def _bot_ids(self) -> set[str]:
+        """大肥鱼（机器人）的 QQ。留空表示自动排除当前登录账号。"""
+        raw = str(self._cfg("bot_ids", "") or "")
+        return {w.strip() for w in raw.replace("，", ",").split(",") if w.strip()}
+
+    def _is_bot(self, event: AstrMessageEvent, uid: str) -> bool:
+        if uid and uid in self._bot_ids():
+            return True
+        try:
+            self_id = str(event.get_self_id() or "")
+        except Exception:
+            self_id = ""
+        return bool(self_id) and uid == self_id
+
     def _level(self, event: AstrMessageEvent, days: int) -> str:
         if self._is_owner(event):
             return "主人"
@@ -89,7 +104,7 @@ class IntimacyStar(Star):
         try:
             if bool(self._cfg("enabled", True)) and self._scope_ok(event):
                 uid = str(event.get_sender_id() or "")
-                if uid:
+                if uid and not self._is_bot(event, uid):
                     name = event.get_sender_name() or ""
                     self.store.hit(uid, name)
         except Exception as exc:
