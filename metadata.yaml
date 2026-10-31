@@ -74,10 +74,11 @@ help: |-
   · inject_enabled　是否注入上下文
   · show_count　注入时是否带条数
   【版本历史】
+  1.2.0　新增「大肥鱼的 QQ（bot_ids）」配置项：不把机器人自己算成聊天对象
   1.1.0　介绍页补「和日记插件联动」说明 + 门槛对齐提醒
   1.0.0　首个版本：生人 / 眼熟 / 亲密 / 主人 四档，按聊天天数推进，
         每次请求注入熟悉度，/亲密度 查看进度
-version: 1.1.0
+version: 1.2.0
 author: 大肥鱼
 repo: https://github.com/xingluocheng/astrbot_plugin_intimacy
 astrbot_version: ">=4.17.0"
