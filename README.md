@@ -57,7 +57,7 @@ git clone https://github.com/xingluocheng/astrbot_plugin_intimacy.git
 
 | 号 | 是什么 | 在哪改 |
 |---|---|---|
-| **大肥鱼（机器人）的 QQ** | 机器人登录的那个号 | **插件里不用填**。它在协议端（SnowLuma / NapCat）扫码登录，插件按聊天对象的号统计 |
+| **大肥鱼（机器人）的 QQ** | 机器人登录的那个号 | 配置项 `bot_ids`。留空 = 自动排除当前登录账号；填了按这个号排除，不会把机器人自己算成聊天对象 |
 | **主人的 QQ** | 你的个人号，这个号恒定最高档 | 插件的 `owner_ids` 配置 |
 
 ### 改法 A：在面板里改（推荐）
@@ -133,6 +133,7 @@ AstrBot/data/config/astrbot_plugin_intimacy_config.json
 |---|---|---|
 | `enabled` | 开 | 总开关 |
 | `owner_ids` | **空** | **必填**，主人 QQ 号 |
+| `bot_ids` | **空** | 大肥鱼的 QQ；留空自动排除机器人自己 |
 | `familiar_days` | 3 | 眼熟门槛 |
 | `close_days` | 14 | 亲密门槛 |
 | `scope` | private | 只统计私聊；`all` 则群聊也统计 |
