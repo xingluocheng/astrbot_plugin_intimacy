@@ -1,0 +1,44 @@
+{
+  "enabled": {
+    "description": "总开关",
+    "type": "bool",
+    "default": true,
+    "hint": "关掉后不再记录天数，也不注入熟悉度。"
+  },
+  "owner_ids": {
+    "description": "主人 QQ 号",
+    "type": "string",
+    "default": "",
+    "hint": "主人的亲密度永远是最高档，不受天数影响。多个用英文逗号；留空则认 AstrBot 管理员。"
+  },
+  "familiar_days": {
+    "description": "聊满多少天算「眼熟」",
+    "type": "int",
+    "default": 3,
+    "hint": "按「实际聊过几个不同的日子」算，不是自然天数。"
+  },
+  "close_days": {
+    "description": "聊满多少天算「亲密」",
+    "type": "int",
+    "default": 14,
+    "hint": "要大于上面的眼熟天数。"
+  },
+  "scope": {
+    "description": "统计范围",
+    "type": "string",
+    "default": "private",
+    "hint": "private = 只统计私聊；all = 群聊也统计。建议保持 private。"
+  },
+  "inject_enabled": {
+    "description": "把熟悉度注入上下文",
+    "type": "bool",
+    "default": true,
+    "hint": "开着，她才知道对面是生人还是熟人，说话距离才会变。"
+  },
+  "show_count": {
+    "description": "注入时带上消息条数",
+    "type": "bool",
+    "default": true,
+    "hint": "关掉只报天数，省一点 token。"
+  }
+}
