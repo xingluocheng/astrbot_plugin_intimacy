@@ -25,7 +25,9 @@ class IntimacyStore:
         for enc in ("utf-8", "utf-8-sig"):
             try:
                 raw = json.loads(self.path.read_text(encoding=enc))
-                return raw if isinstance(raw, dict) else {}
+                if isinstance(raw, dict):
+                    return self._clean_names(raw)
+                return {}
             except FileNotFoundError:
                 return {}
             except Exception:
@@ -37,6 +39,17 @@ class IntimacyStore:
         except Exception:
             pass
         return {}
+
+    @staticmethod
+    def _clean_names(raw: dict) -> dict:
+        """昵称存成 QQ 号的清掉，交给展示层显示「QQ尾号xxxx」。"""
+        for uid, rec in raw.items():
+            if not isinstance(rec, dict):
+                continue
+            name = str(rec.get("name") or "").strip()
+            if not name or name == str(uid) or (name.isdigit() and name == str(uid)):
+                rec["name"] = ""
+        return raw
 
     def save(self) -> None:
         with self._lock:
@@ -106,3 +119,7 @@ class IntimacyStore:
             "last": rec.get("last") or "",
             "name": rec.get("name") or "",
         }
+
+    def all_snapshots(self) -> list[tuple[str, dict]]:
+        """所有人都取一份快照，给主人查看总表用。"""
+        return [(str(uid), self.snapshot(str(uid))) for uid in list(self.data.keys())]
