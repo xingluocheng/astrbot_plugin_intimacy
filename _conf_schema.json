@@ -32,8 +32,8 @@
   "scope": {
     "description": "统计范围",
     "type": "string",
-    "default": "private",
-    "hint": "private = 只统计私聊；all = 群聊也统计。建议保持 private。"
+    "default": "all",
+    "hint": "private=只私聊；group=只群聊；all=私聊和群聊都算（默认）。群聊里每个人分别统计。"
   },
   "inject_enabled": {
     "description": "把熟悉度注入上下文",
