@@ -34,6 +34,7 @@ class IntimacyStar(Star):
         self.config = config if config is not None else {}
         data_dir = Path(StarTools.get_data_dir(PLUGIN_NAME))
         self.store = IntimacyStore(data_dir)
+        self._nick_cache: dict[str, str] = {}
         logger.info(f"[intimacy] 数据目录：{data_dir}")
 
     # ------------------------------------------------------------- 基础
@@ -106,6 +107,55 @@ class IntimacyStar(Star):
             self_id = ""
         return bool(self_id) and uid == self_id
 
+    async def _fetch_nickname(self, event: AstrMessageEvent, uid: str) -> str:
+        """昵称拿不到时，直接问协议端要。拿到就缓存。"""
+        cached = self._nick_cache.get(uid)
+        if cached:
+            return cached
+        bot = getattr(event, "bot", None)
+        if bot is None or not hasattr(bot, "call_action"):
+            return ""
+        routing = {}
+        try:
+            self_id = getattr(event.message_obj, "self_id", None)
+            if self_id:
+                routing["self_id"] = self_id
+        except Exception:
+            pass
+        group_id = ""
+        try:
+            group = getattr(event.message_obj, "group", None)
+            group_id = str(getattr(group, "group_id", "") or "")
+        except Exception:
+            group_id = ""
+
+        name = ""
+        try:
+            if group_id:
+                info = await bot.call_action(
+                    "get_group_member_info",
+                    group_id=int(group_id),
+                    user_id=int(uid),
+                    no_cache=False,
+                    **routing,
+                )
+                if isinstance(info, dict):
+                    name = str(info.get("card") or info.get("nickname") or "")
+            if not name:
+                info = await bot.call_action(
+                    "get_stranger_info", user_id=int(uid), no_cache=False, **routing
+                )
+                if isinstance(info, dict):
+                    name = str(info.get("nickname") or "")
+        except Exception as exc:
+            logger.debug(f"[intimacy] 取昵称失败 {uid}: {exc}")
+            return ""
+
+        name = self._clean_name(uid, name)
+        if name:
+            self._nick_cache[uid] = name
+        return name
+
     def _level(self, event: AstrMessageEvent, days: int) -> str:
         if self._is_owner(event):
             return "主人"
@@ -125,6 +175,9 @@ class IntimacyStar(Star):
                 uid = str(event.get_sender_id() or "")
                 if uid and not self._is_bot(event, uid):
                     name = self._clean_name(uid, event.get_sender_name() or "")
+                    if not name:
+                        # 协议端给的是 QQ 号或者空，去问一次真名
+                        name = await self._fetch_nickname(event, uid)
                     self.store.hit(uid, name)
         except Exception as exc:
             logger.debug(f"[intimacy] 记录失败：{exc}")
@@ -169,9 +222,21 @@ class IntimacyStar(Star):
     async def cmd_level(self, event: AstrMessageEvent):
         uid = str(event.get_sender_id() or "")
         snap = self.store.snapshot(uid)
-        if self._is_owner(event):
-            yield event.plain_result("你是主人呀，亲密度永远是最高的那一档。")
+        arguments = (getattr(event, "message_str", "") or "").split()
+        if len(arguments) > 1 and arguments[1] in {"列表", "全部", "所有人", "list"}:
+            async for chunk in self._owner_report(event):
+                yield chunk
             return
+        if self._is_owner(event):
+            lines = [
+                "你是主人呀，亲密度永远是最高的那一档。",
+                f"不过记录还在：认识 {snap['span_days']} 天，实际聊过 {snap['days_chatted']} 天，"
+                f"共 {snap['count']} 条。",
+                "想看所有人的？发「/亲密度 列表」。",
+            ]
+            yield event.plain_result("\n".join(lines))
+            return
+
         level = self._level(event, snap["days_chatted"])
         close = int(self._cfg("close_days", 14) or 14)
         familiar = int(self._cfg("familiar_days", 3) or 3)
@@ -188,3 +253,66 @@ class IntimacyStar(Star):
         else:
             lines.append("已经是「亲密」了哦。")
         yield event.plain_result("\n".join(lines))
+
+    @filter.command("好感度")
+    async def cmd_report(self, event: AstrMessageEvent):
+        async for chunk in self._owner_report(event):
+            yield chunk
+
+    async def _owner_report(self, event: AstrMessageEvent):
+        """主人专用：所有人的好感度记录 + 还差几天升级。"""
+        if not self._is_owner(event):
+            uid = str(event.get_sender_id() or "")
+            snap = self.store.snapshot(uid)
+            level = self._level(event, snap["days_chatted"])
+            gap = self._gap_text(snap["days_chatted"])
+            name = self._display_name(uid, snap.get("name") or "")
+            yield event.plain_result(
+                f"这条只有主人能看哦。\n你（{name}）现在是「{level}」，聊过 "
+                f"{snap['days_chatted']} 天、{snap['count']} 条，{gap}"
+            )
+            return
+
+        rows = self.store.all_snapshots()
+        if not rows:
+            yield event.plain_result("还没有任何记录呢，先聊几句吧。")
+            return
+
+        owners = self._owner_ids()
+        decorated = []
+        for uid, snap in rows:
+            is_owner = uid in owners
+            decorated.append((is_owner, snap["days_chatted"], snap["count"], uid, snap))
+        decorated.sort(key=lambda x: (not x[0], -x[1], -x[2]))
+
+        lines = [f"【好感度记录】共 {len(decorated)} 人"]
+        for idx, (is_owner, days, count, uid, snap) in enumerate(decorated, 1):
+            name = self._display_name(uid, snap.get("name") or "")
+            if is_owner:
+                lines.append(
+                    f"{idx}. {name}　主人（恒定最高）　"
+                    f"聊过 {days} 天 / {count} 条"
+                )
+            else:
+                level = self._level_for_days(days)
+                lines.append(f"{idx}. {name}　{level}　聊过 {days} 天 / {count} 条")
+                lines.append(f"　　{self._gap_text(days)}")
+        yield event.plain_result("\n".join(lines))
+
+    def _level_for_days(self, days: int) -> str:
+        close = int(self._cfg("close_days", 14) or 14)
+        familiar = int(self._cfg("familiar_days", 3) or 3)
+        if days >= close:
+            return "亲密"
+        if days >= familiar:
+            return "眼熟"
+        return "生人"
+
+    def _gap_text(self, days: int) -> str:
+        close = int(self._cfg("close_days", 14) or 14)
+        familiar = int(self._cfg("familiar_days", 3) or 3)
+        if days < familiar:
+            return f"再聊 {familiar - days} 天升「眼熟」"
+        if days < close:
+            return f"再聊 {close - days} 天升「亲密」"
+        return "已经到最高档啦"
