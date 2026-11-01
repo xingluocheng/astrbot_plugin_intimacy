@@ -220,23 +220,14 @@ class IntimacyStar(Star):
     # ------------------------------------------------------------- 指令
     @filter.command("亲密度")
     async def cmd_level(self, event: AstrMessageEvent):
-        uid = str(event.get_sender_id() or "")
-        snap = self.store.snapshot(uid)
-        arguments = (getattr(event, "message_str", "") or "").split()
-        if len(arguments) > 1 and arguments[1] in {"列表", "全部", "所有人", "list"}:
+        """主人看到所有人总表，其他人只看自己。"""
+        if self._is_owner(event):
             async for chunk in self._owner_report(event):
                 yield chunk
             return
-        if self._is_owner(event):
-            lines = [
-                "你是主人呀，亲密度永远是最高的那一档。",
-                f"不过记录还在：认识 {snap['span_days']} 天，实际聊过 {snap['days_chatted']} 天，"
-                f"共 {snap['count']} 条。",
-                "想看所有人的？发「/亲密度 列表」。",
-            ]
-            yield event.plain_result("\n".join(lines))
-            return
 
+        uid = str(event.get_sender_id() or "")
+        snap = self.store.snapshot(uid)
         level = self._level(event, snap["days_chatted"])
         close = int(self._cfg("close_days", 14) or 14)
         familiar = int(self._cfg("familiar_days", 3) or 3)
@@ -256,7 +247,8 @@ class IntimacyStar(Star):
 
     @filter.command("好感度")
     async def cmd_report(self, event: AstrMessageEvent):
-        async for chunk in self._owner_report(event):
+        """老指令，保留兼容，指向 /亲密度。"""
+        async for chunk in self.cmd_level(event):
             yield chunk
 
     async def _owner_report(self, event: AstrMessageEvent):
