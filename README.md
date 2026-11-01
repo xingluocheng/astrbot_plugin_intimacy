@@ -136,7 +136,7 @@ AstrBot/data/config/astrbot_plugin_intimacy_config.json
 | `bot_ids` | **空** | 大肥鱼的 QQ；留空自动排除机器人自己 |
 | `familiar_days` | 3 | 眼熟门槛 |
 | `close_days` | 14 | 亲密门槛 |
-| `scope` | private | 只统计私聊；`all` 则群聊也统计 |
+| `scope` | **all** | `private` 只私聊 / `group` 只群聊 / `all` 私聊+群聊都算（默认） |
 | `inject_enabled` | 开 | 是否注入上下文 |
 | `show_count` | 开 | 注入时带不带消息条数（关掉省 token） |
 
@@ -190,6 +190,15 @@ AstrBot/data/plugin_data/astrbot_plugin_intimacy/users.json
 ---
 
 ## 九、版本历史
+
+### 1.3.0 — 2026-11-01
+- 修复：群聊聊天不算亲密度（`scope` 新增 `all`，**默认私聊+群聊都算**）
+- 修复：名字显示成 QQ 号，现在没昵称会显示「QQ尾号0199」
+- 修复：`users.json` 带 BOM 时会被当成空数据，现在兼容并自动备份损坏文件
+
+### 1.2.0 — 2026-11-01
+- 新增配置项 `bot_ids`（大肥鱼的 QQ）：不把机器人自己算成聊天对象
+- 配置面板里可以同时改「大肥鱼的 QQ」和「主人的 QQ」
 
 ### 1.1.0 — 2026-10-31
 - 介绍页补「和日记插件联动」章节 + 门槛对齐提醒
