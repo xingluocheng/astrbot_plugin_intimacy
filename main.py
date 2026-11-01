@@ -20,7 +20,7 @@ DEFAULTS = {
     "bot_ids": "",
     "familiar_days": 3,
     "close_days": 14,
-    "scope": "private",
+    "scope": "all",
     "inject_enabled": True,
     "show_count": True,
 }
@@ -64,13 +64,32 @@ class IntimacyStar(Star):
             return False
 
     def _scope_ok(self, event: AstrMessageEvent) -> bool:
-        scope = str(self._cfg("scope", "private") or "private").lower()
-        if scope != "private":
-            return True
+        """统计范围：private 只私聊 / group 只群聊 / all 都算。"""
+        scope = str(self._cfg("scope", "all") or "all").lower()
         try:
-            return bool(event.is_private_chat())
+            is_private = bool(event.is_private_chat())
         except Exception:
-            return False
+            is_private = False
+        if scope == "private":
+            return is_private
+        if scope == "group":
+            return not is_private
+        return True
+
+    def _clean_name(self, uid: str, name: str) -> str:
+        """昵称清洗：协议端常把昵称填成 QQ 号，这种当没有。"""
+        n = (name or "").strip()
+        if not n or n == str(uid) or (n.isdigit() and n == str(uid)):
+            return ""
+        return n
+
+    def _display_name(self, uid: str, name: str) -> str:
+        """展示用名字：没昵称就用「QQ尾号xxxx」，别把一长串数字甩给模型。"""
+        n = self._clean_name(uid, name)
+        if n:
+            return n
+        tail = str(uid)[-4:] if len(str(uid)) >= 4 else str(uid)
+        return f"QQ尾号{tail}"
 
     # ------------------------------------------------------------- 等级
     def _bot_ids(self) -> set[str]:
@@ -105,7 +124,7 @@ class IntimacyStar(Star):
             if bool(self._cfg("enabled", True)) and self._scope_ok(event):
                 uid = str(event.get_sender_id() or "")
                 if uid and not self._is_bot(event, uid):
-                    name = event.get_sender_name() or ""
+                    name = self._clean_name(uid, event.get_sender_name() or "")
                     self.store.hit(uid, name)
         except Exception as exc:
             logger.debug(f"[intimacy] 记录失败：{exc}")
@@ -132,7 +151,7 @@ class IntimacyStar(Star):
 
             snap = self.store.snapshot(uid)
             level = self._level(event, snap["days_chatted"])
-            who = snap.get("name") or "这个人"
+            who = self._display_name(uid, snap.get("name") or "")
             parts = [
                 f"【熟悉度】你正在和「{who}」聊天（不是主人）。",
                 f"认识 {snap['span_days']} 天，实际聊过 {snap['days_chatted']} 天",
@@ -157,7 +176,8 @@ class IntimacyStar(Star):
         close = int(self._cfg("close_days", 14) or 14)
         familiar = int(self._cfg("familiar_days", 3) or 3)
         lines = [
-            f"和本鲸认识 {snap['span_days']} 天，实际聊过 {snap['days_chatted']} 天，共 {snap['count']} 条。",
+            f"你是「{self._display_name(uid, snap.get('name') or '')}」"
+            f"——和本鲸认识 {snap['span_days']} 天，实际聊过 {snap['days_chatted']} 天，共 {snap['count']} 条。",
             f"现在的熟悉度：{level}",
         ]
         days = snap["days_chatted"]
