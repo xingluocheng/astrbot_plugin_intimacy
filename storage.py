@@ -22,11 +22,21 @@ class IntimacyStore:
         self.data: dict = self._load()
 
     def _load(self) -> dict:
+        for enc in ("utf-8", "utf-8-sig"):
+            try:
+                raw = json.loads(self.path.read_text(encoding=enc))
+                return raw if isinstance(raw, dict) else {}
+            except FileNotFoundError:
+                return {}
+            except Exception:
+                continue
+        # 真读不出来就先备份一份，别直接覆盖掉历史
         try:
-            raw = json.loads(self.path.read_text(encoding="utf-8"))
-            return raw if isinstance(raw, dict) else {}
+            bak = self.path.with_suffix(".broken")
+            self.path.replace(bak)
         except Exception:
-            return {}
+            pass
+        return {}
 
     def save(self) -> None:
         with self._lock:
