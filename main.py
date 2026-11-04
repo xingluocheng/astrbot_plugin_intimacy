@@ -308,3 +308,57 @@ class IntimacyStar(Star):
         if days < close:
             return f"再聊 {close - days} 天升「亲密」"
         return "已经到最高档啦"
+
+    # ------------------------------------------------------------- 工具
+    @filter.llm_tool(name="intimacy_lookup")
+    async def tool_lookup(self, event: AstrMessageEvent, person: str = "") -> str:
+        """查熟悉度。主人问「我和谁最熟」「某某到哪一档了」「还差几天」时用，不用打指令。
+
+        Args:
+            person(string): 可选。要查的人的名字或QQ号；留空就列出所有人排名。
+        """
+        rows = self.store.all_snapshots()
+        if not rows:
+            return "还没有任何记录，先聊几句吧。"
+        owners = self._owner_ids()
+
+        if person.strip():
+            kw = person.strip().lower()
+            hits = []
+            for uid, snap in rows:
+                fields = [str(snap.get("name") or ""), str(uid), f"QQ尾号{str(uid)[-4:]}"]
+                if any(kw and (kw == f.lower() or (len(kw) >= 2 and kw in f.lower())) for f in fields if f):
+                    hits.append((uid, snap))
+            if not hits:
+                names = "、".join(self._display_name(u, s.get("name") or "") for u, s in rows)
+                return f"没找到「{person}」。认识的人有：{names}"
+            uid, snap = hits[0]
+            name = self._display_name(uid, snap.get("name") or "")
+            if uid in owners:
+                return (
+                    f"{name} 是主人，亲密度恒定最高，不随天数变化。"
+                    f"聊过 {snap['days_chatted']} 天，共 {snap['count']} 条。"
+                )
+            return (
+                f"{name}：{self._level_for_days(snap['days_chatted'])}，"
+                f"认识 {snap['span_days']} 天，实际聊过 {snap['days_chatted']} 天，"
+                f"共 {snap['count']} 条。{self._gap_text(snap['days_chatted'])}。"
+            )
+
+        decorated = sorted(
+            ((uid in owners, snap["days_chatted"], snap["count"], uid, snap) for uid, snap in rows),
+            key=lambda x: (not x[0], -x[1], -x[2]),
+        )
+        lines = [f"共 {len(decorated)} 人："]
+        for idx, (is_owner, days, count, uid, snap) in enumerate(decorated, 1):
+            name = self._display_name(uid, snap.get("name") or "")
+            if is_owner:
+                lines.append(f"{idx}. {name}　主人（恒定最高）　{days} 天 / {count} 条")
+            else:
+                lines.append(
+                    f"{idx}. {name}　{self._level_for_days(days)}　{days} 天 / {count} 条，"
+                    f"{self._gap_text(days)}"
+                )
+        lines.append("")
+        lines.append("用你自己的口吻回答，别照念这个格式。")
+        return "\n".join(lines)
