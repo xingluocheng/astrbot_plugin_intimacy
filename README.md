@@ -235,6 +235,7 @@ https://github.com/xingluocheng/astrbot_plugin_intimacy
 
 - [大肥鱼的空间](https://github.com/xingluocheng/astrbot_plugin_qzone_mood) —— 情绪驱动自动发 QQ 空间说说
 - [大肥鱼的日记](https://github.com/xingluocheng/astrbot_plugin_diary) —— 把每天发生的事写成日记存到桌面
+- [大肥鱼的自拍](https://github.com/xingluocheng/astrbot_plugin_selfie) —— 聊天里她自己判断要不要拍照，自己写提示词出图
 
 ---
 
